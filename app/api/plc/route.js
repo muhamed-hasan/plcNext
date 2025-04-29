@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { storePlcData } from '../../lib/db';
 
 // Since nodes7 uses CommonJS, we need to import it dynamically in a Next.js environment
 let nodes7;
@@ -11,7 +12,7 @@ try {
 
 // PLC connection configuration
 const plcConfig = {
-  ip: '192.168.1.2', // Match the IP address from the Python implementation
+  ip: '192.168.0.1', // Updated IP address
   rack: 0,
   slot: 1,
   port: 102
@@ -74,7 +75,7 @@ export async function GET() {
           return variables[tag];
         });
         
-        conn.addItems(Object.keys(variables));
+        conn.addItems(Object.entries(variables).map(([key]) => key));
         
         conn.readAllItems((err, values) => {
           if (err) {
@@ -91,10 +92,16 @@ export async function GET() {
 
     try {
       const data = await readPLC();
+      const timestamp = new Date().toISOString();
+      
+      // Store the data in the database
+      const result = { timestamp, data };
+      await storePlcData(result);
+      
       return NextResponse.json({ 
         success: true, 
         data,
-        timestamp: new Date().toISOString()
+        timestamp
       });
     } catch (error) {
       return NextResponse.json(
