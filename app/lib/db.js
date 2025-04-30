@@ -24,8 +24,8 @@ const influx = new InfluxDB({
         T9: FieldType.FLOAT,
         T10: FieldType.FLOAT,
         H1: FieldType.FLOAT,
-        H2: FieldType.FLOAT
-        // Air_Speed removed to avoid field type issues
+        H2: FieldType.FLOAT,
+        Air_Speed: FieldType.FLOAT  // Re-added Air_Speed field
       },
       tags: ['source']
     }
@@ -132,8 +132,8 @@ export async function storePlcData(data) {
     const fields = {};
     
     for (const [key, value] of Object.entries(data.data)) {
-      // Only process temperature and humidity fields (exclude Air_Speed)
-      if (key.startsWith('T') || key.startsWith('H')) {
+      // Process temperature, humidity, and Air_Speed fields
+      if (key.startsWith('T') || key.startsWith('H') || key === 'Air_Speed') {
         try {
           // Explicitly convert to float and ensure no NaN values
           const numValue = typeof value === 'string' ? parseFloat(value) : Number(value);
@@ -243,16 +243,23 @@ export async function getHistoricalData(timeRange = '24h', customRange = null) {
     `;
     console.log('🔍 Humidity query:', humidityQuery.trim());
     
-    console.log('📊 Air_Speed is not stored in the database, will return empty values');
+    // Query air speed data
+    const airSpeedQuery = `
+      SELECT Air_Speed
+      FROM plc_readings
+      WHERE ${timeFilter}
+    `;
+    console.log('🔍 Air Speed query:', airSpeedQuery.trim());
     
-    // Execute temperature and humidity queries in parallel
+    // Execute temperature, humidity, and air speed queries in parallel
     console.log('🔍 Executing queries...');
-    const [temperatureResults, humidityResults] = await Promise.all([
+    const [temperatureResults, humidityResults, airSpeedResults] = await Promise.all([
       influx.query(temperatureQuery),
-      influx.query(humidityQuery)
+      influx.query(humidityQuery),
+      influx.query(airSpeedQuery)
     ]);
     
-    console.log(`✅ Queries completed. Results: Temperature: ${temperatureResults.length} points, Humidity: ${humidityResults.length} points`);
+    console.log(`✅ Queries completed. Results: Temperature: ${temperatureResults.length} points, Humidity: ${humidityResults.length} points, Air Speed: ${airSpeedResults.length} points`);
     
     // Process and format the results
     console.log('📊 Processing temperature data...');
@@ -277,11 +284,11 @@ export async function getHistoricalData(timeRange = '24h', customRange = null) {
       H2: point.H2 || null
     }));
     
-    // Create empty airSpeed array with the same timestamps as temperature data
-    console.log('📊 Creating empty airSpeed data with matching timestamps...');
-    const airSpeed = temperatureResults.map(point => ({
+    // Process air speed data
+    console.log('📊 Processing air speed data...');
+    const airSpeed = airSpeedResults.map(point => ({
       time: new Date(point.time).toISOString(),
-      Air_Speed: null // Air_Speed is not stored in the database
+      Air_Speed: point.Air_Speed || null
     }));
     
     console.log(`✅ Historical data processing complete. Returning ${temperatures.length} data points.`);

@@ -20,8 +20,9 @@ export async function GET(request) {
         T10: Math.floor(19 + Math.random() * 11),
         // Humidity fields
         H1: Math.floor(40 + Math.random() * 20),
-        H2: Math.floor(45 + Math.random() * 15)
-        // Air_Speed removed to match the database schema
+        H2: Math.floor(45 + Math.random() * 15),
+        // Air Speed field (re-added)
+        Air_Speed: parseFloat((5 + Math.random() * 10).toFixed(2))
       };
     };
 
