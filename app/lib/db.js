@@ -37,13 +37,33 @@ const influx = new InfluxDB({
  */
 async function initializeDatabase() {
   try {
+    console.log('🔍 Attempting to connect to InfluxDB at localhost:8086...');
+    
+    // Check if we can connect to InfluxDB
+    try {
+      const ping = await influx.ping(5000);
+      console.log('✅ InfluxDB connection successful:', {
+        version: ping[0].version,
+        online: ping[0].online,
+        responseTime: `${ping[0].rtt}ms`
+      });
+    } catch (pingError) {
+      console.error('❌ InfluxDB connection failed:', pingError.message);
+      return false;
+    }
+    
     // Check if the database exists, create it if it doesn't
+    console.log('🔍 Checking for database: plc_data');
     const databases = await influx.getDatabaseNames();
+    console.log('📋 Available databases:', databases);
+    
     if (!databases.includes('plc_data')) {
-      console.log('Creating InfluxDB database: plc_data');
+      console.log('🔧 Creating InfluxDB database: plc_data');
       await influx.createDatabase('plc_data');
+      console.log('✅ Database created successfully');
       
       // Set up retention policies if needed
+      console.log('🔧 Setting up retention policy: one_month');
       await influx.createRetentionPolicy({
         name: 'one_month',
         database: 'plc_data',
@@ -51,10 +71,29 @@ async function initializeDatabase() {
         replication: 1,
         isDefault: true
       });
+      console.log('✅ Retention policy created successfully');
+    } else {
+      console.log('✅ Database plc_data already exists');
     }
+    
+    // Check if the measurement exists
+    console.log('🔍 Checking for measurement: plc_readings');
+    try {
+      const measurements = await influx.getMeasurements();
+      console.log('📋 Available measurements:', measurements);
+      
+      if (measurements.includes('plc_readings')) {
+        console.log('✅ Measurement plc_readings exists');
+      } else {
+        console.log('⚠️ Measurement plc_readings does not exist yet. It will be created when data is written.');
+      }
+    } catch (measurementError) {
+      console.error('❌ Error checking measurements:', measurementError.message);
+    }
+    
     return true;
   } catch (error) {
-    console.error('Error initializing InfluxDB database:', error);
+    console.error('❌ Error initializing InfluxDB database:', error);
     return false;
   }
 }
@@ -67,9 +106,13 @@ async function initializeDatabase() {
 export async function storePlcData(data) {
   try {
     // Ensure database exists
-    await initializeDatabase();
+    const dbInitialized = await initializeDatabase();
+    if (!dbInitialized) {
+      console.error('⚠️ Database initialization failed, cannot store data');
+      return false;
+    }
     
-    console.log('Storing PLC data in InfluxDB:', data.timestamp);
+    console.log('📊 Preparing to store PLC data in InfluxDB:', data.timestamp);
     
     // Create points array for InfluxDB
     const points = [
@@ -82,21 +125,48 @@ export async function storePlcData(data) {
     ];
     
     // Add all data fields to the point
+    let fieldCount = 0;
+    console.log('🔍 Processing PLC data fields...');
+    
     for (const [key, value] of Object.entries(data.data)) {
       // Only process temperature and humidity fields (exclude Air_Speed)
       if (key.startsWith('T') || key.startsWith('H')) {
         // Explicitly convert to float and ensure no NaN values
         const numValue = typeof value === 'string' ? parseFloat(value) : Number(value);
-        points[0].fields[key] = isNaN(numValue) ? 0.0 : numValue;
+        const finalValue = isNaN(numValue) ? 0.0 : numValue;
+        points[0].fields[key] = finalValue;
+        fieldCount++;
+        console.log(`  - Field ${key}: ${finalValue}`);
       }
     }
     
+    console.log(`✅ Processed ${fieldCount} fields for storage`);
+    
+    if (fieldCount === 0) {
+      console.warn('⚠️ No valid fields found to store');
+      return false;
+    }
+    
+    // Log the point being written
+    console.log('📝 Writing point to InfluxDB:', {
+      measurement: points[0].measurement,
+      timestamp: points[0].timestamp,
+      tags: points[0].tags,
+      fieldCount: Object.keys(points[0].fields).length
+    });
+    
     // Write the point to InfluxDB
     await influx.writePoints(points);
+    console.log('✅ Data successfully written to InfluxDB');
     
     return true;
   } catch (error) {
-    console.error('Error storing PLC data in InfluxDB:', error);
+    console.error('❌ Error storing PLC data in InfluxDB:', error);
+    console.error('❌ Error details:', {
+      message: error.message,
+      stack: error.stack,
+      name: error.name
+    });
     return false;
   }
 }
@@ -110,9 +180,13 @@ export async function storePlcData(data) {
 export async function getHistoricalData(timeRange = '24h', customRange = null) {
   try {
     // Ensure database exists
-    await initializeDatabase();
+    const dbInitialized = await initializeDatabase();
+    if (!dbInitialized) {
+      console.error('⚠️ Database initialization failed, cannot retrieve historical data');
+      return { temperatures: [], humidity: [], airSpeed: [] };
+    }
     
-    console.log('Fetching historical data for range:', timeRange);
+    console.log('📊 Fetching historical data for range:', timeRange);
     
     // Calculate time range for the query
     let timeFilter;
@@ -122,6 +196,7 @@ export async function getHistoricalData(timeRange = '24h', customRange = null) {
       const startDate = moment(customRange.startDate).toISOString();
       const endDate = moment(customRange.endDate).toISOString();
       timeFilter = `time >= '${startDate}' AND time <= '${endDate}'`;
+      console.log(`📅 Using custom date range: ${startDate} to ${endDate}`);
     } else {
       // Use predefined time ranges
       switch (timeRange) {
@@ -137,6 +212,7 @@ export async function getHistoricalData(timeRange = '24h', customRange = null) {
         default:
           timeFilter = 'time > now() - 24h'; // Default to 24 hours
       }
+      console.log(`📅 Using predefined time range: ${timeRange} (${timeFilter})`);
     }
     
     // Query temperature data
@@ -145,6 +221,7 @@ export async function getHistoricalData(timeRange = '24h', customRange = null) {
       FROM plc_readings
       WHERE ${timeFilter}
     `;
+    console.log('🔍 Temperature query:', temperatureQuery.trim());
     
     // Query humidity data
     const humidityQuery = `
@@ -152,17 +229,21 @@ export async function getHistoricalData(timeRange = '24h', customRange = null) {
       FROM plc_readings
       WHERE ${timeFilter}
     `;
+    console.log('🔍 Humidity query:', humidityQuery.trim());
     
-    // Air_Speed is no longer stored in the database, so we'll create mock data
-    // that matches the expected format but with empty values
+    console.log('📊 Air_Speed is not stored in the database, will return empty values');
     
     // Execute temperature and humidity queries in parallel
+    console.log('🔍 Executing queries...');
     const [temperatureResults, humidityResults] = await Promise.all([
       influx.query(temperatureQuery),
       influx.query(humidityQuery)
     ]);
     
+    console.log(`✅ Queries completed. Results: Temperature: ${temperatureResults.length} points, Humidity: ${humidityResults.length} points`);
+    
     // Process and format the results
+    console.log('📊 Processing temperature data...');
     const temperatures = temperatureResults.map(point => ({
       time: new Date(point.time).toISOString(),
       T1: point.T1 || null,
@@ -177,6 +258,7 @@ export async function getHistoricalData(timeRange = '24h', customRange = null) {
       T10: point.T10 || null
     }));
     
+    console.log('📊 Processing humidity data...');
     const humidity = humidityResults.map(point => ({
       time: new Date(point.time).toISOString(),
       H1: point.H1 || null,
@@ -184,10 +266,13 @@ export async function getHistoricalData(timeRange = '24h', customRange = null) {
     }));
     
     // Create empty airSpeed array with the same timestamps as temperature data
+    console.log('📊 Creating empty airSpeed data with matching timestamps...');
     const airSpeed = temperatureResults.map(point => ({
       time: new Date(point.time).toISOString(),
       Air_Speed: null // Air_Speed is not stored in the database
     }));
+    
+    console.log(`✅ Historical data processing complete. Returning ${temperatures.length} data points.`);
     
     return {
       temperatures,
@@ -195,9 +280,12 @@ export async function getHistoricalData(timeRange = '24h', customRange = null) {
       airSpeed
     };
   } catch (error) {
-    console.error('Error fetching historical data from InfluxDB:', error);
-    
-    // Return empty data on error
+    console.error('❌ Error fetching historical data:', error);
+    console.error('❌ Error details:', {
+      message: error.message,
+      stack: error.stack,
+      name: error.name
+    });
     return {
       temperatures: [],
       humidity: [],
