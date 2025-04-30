@@ -1,6 +1,6 @@
 // InfluxDB connection for storing and retrieving PLC data
-import { InfluxDB, FieldType } from 'influx';
-import moment from 'moment';
+const { InfluxDB, FieldType } = require('influx');
+const moment = require('moment');
 
 // InfluxDB connection configuration - without authentication since user doesn't have credentials
 const influx = new InfluxDB({
@@ -103,7 +103,7 @@ async function initializeDatabase() {
  * @param {Object} data - The PLC data to store (contains timestamp and data fields)
  * @returns {Promise<boolean>} - Success status
  */
-export async function storePlcData(data) {
+async function storePlcData(data) {
   try {
     // Ensure database exists
     const dbInitialized = await initializeDatabase();
@@ -189,7 +189,7 @@ export async function storePlcData(data) {
  * @param {Object} customRange - Custom time range with start and end dates (only used when timeRange is 'custom')
  * @returns {Promise<Object>} - Historical data
  */
-export async function getHistoricalData(timeRange = '24h', customRange = null) {
+async function getHistoricalData(timeRange = '24h', customRange = null) {
   try {
     // Ensure database exists
     const dbInitialized = await initializeDatabase();
@@ -317,7 +317,7 @@ export async function getHistoricalData(timeRange = '24h', customRange = null) {
  * Get the latest PLC data from InfluxDB
  * @returns {Promise<Object>} - Latest data point
  */
-export async function getLatestData() {
+async function getLatestData() {
   try {
     // Ensure database exists
     await initializeDatabase();
@@ -342,4 +342,12 @@ export async function getLatestData() {
     console.error('Error fetching latest data from InfluxDB:', error);
     return null;
   }
-} 
+}
+
+// Export the functions for use in other modules
+module.exports = {
+  storePlcData,
+  getHistoricalData,
+  initializeDatabase,
+  getLatestData
+};
