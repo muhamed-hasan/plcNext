@@ -2,29 +2,29 @@
 import { InfluxDB } from 'influx';
 import moment from 'moment';
 
-// InfluxDB connection configuration
+// InfluxDB connection configuration - without authentication since user doesn't have credentials
 const influx = new InfluxDB({
   host: 'localhost',
   port: 8086,
   database: 'plc_data',
-  username: 'admin',  // Change these credentials as needed
-  password: 'admin',  // Change these credentials as needed
+  // No username/password as mentioned by user
   schema: [
     {
       measurement: 'plc_readings',
       fields: {
-        T1: 'float',
-        T2: 'float',
-        T3: 'float',
-        T4: 'float',
-        T5: 'float',
-        T6: 'float',
-        T7: 'float',
-        T8: 'float',
-        T9: 'float',
-        T10: 'float',
-        H1: 'float',
-        H2: 'float'
+        // Using FieldType constants instead of strings
+        T1: InfluxDB.FieldType.FLOAT,
+        T2: InfluxDB.FieldType.FLOAT,
+        T3: InfluxDB.FieldType.FLOAT,
+        T4: InfluxDB.FieldType.FLOAT,
+        T5: InfluxDB.FieldType.FLOAT,
+        T6: InfluxDB.FieldType.FLOAT,
+        T7: InfluxDB.FieldType.FLOAT,
+        T8: InfluxDB.FieldType.FLOAT,
+        T9: InfluxDB.FieldType.FLOAT,
+        T10: InfluxDB.FieldType.FLOAT,
+        H1: InfluxDB.FieldType.FLOAT,
+        H2: InfluxDB.FieldType.FLOAT
         // Air_Speed removed to avoid field type issues
       },
       tags: ['source']
