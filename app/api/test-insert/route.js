@@ -7,6 +7,7 @@ export async function GET(request) {
     // Generate a sample data point
     const generateSampleData = () => {
       return {
+        // Temperature fields
         T1: Math.floor(20 + Math.random() * 10),
         T2: Math.floor(22 + Math.random() * 8),
         T3: Math.floor(18 + Math.random() * 12),
@@ -17,9 +18,10 @@ export async function GET(request) {
         T8: Math.floor(21 + Math.random() * 10),
         T9: Math.floor(20 + Math.random() * 9),
         T10: Math.floor(19 + Math.random() * 11),
+        // Humidity fields
         H1: Math.floor(40 + Math.random() * 20),
-        H2: Math.floor(45 + Math.random() * 15),
-        Air_Speed: parseFloat((5 + Math.random() * 10).toFixed(2))
+        H2: Math.floor(45 + Math.random() * 15)
+        // Air_Speed removed to match the database schema
       };
     };
 

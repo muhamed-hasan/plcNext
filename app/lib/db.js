@@ -1,5 +1,5 @@
 // InfluxDB connection for storing and retrieving PLC data
-import { InfluxDB } from 'influx';
+import { InfluxDB, FieldType } from 'influx';
 import moment from 'moment';
 
 // InfluxDB connection configuration - without authentication since user doesn't have credentials
@@ -12,19 +12,19 @@ const influx = new InfluxDB({
     {
       measurement: 'plc_readings',
       fields: {
-        // Using string-based field types for compatibility with InfluxDB 1.8.4
-        T1: 'float',
-        T2: 'float',
-        T3: 'float',
-        T4: 'float',
-        T5: 'float',
-        T6: 'float',
-        T7: 'float',
-        T8: 'float',
-        T9: 'float',
-        T10: 'float',
-        H1: 'float',
-        H2: 'float'
+        // Using FieldType.FLOAT as shown in the documentation example
+        T1: FieldType.FLOAT,
+        T2: FieldType.FLOAT,
+        T3: FieldType.FLOAT,
+        T4: FieldType.FLOAT,
+        T5: FieldType.FLOAT,
+        T6: FieldType.FLOAT,
+        T7: FieldType.FLOAT,
+        T8: FieldType.FLOAT,
+        T9: FieldType.FLOAT,
+        T10: FieldType.FLOAT,
+        H1: FieldType.FLOAT,
+        H2: FieldType.FLOAT
         // Air_Speed removed to avoid field type issues
       },
       tags: ['source']
