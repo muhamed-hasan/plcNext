@@ -12,19 +12,19 @@ const influx = new InfluxDB({
     {
       measurement: 'plc_readings',
       fields: {
-        // Using FieldType constants instead of strings
-        T1: InfluxDB.FieldType.FLOAT,
-        T2: InfluxDB.FieldType.FLOAT,
-        T3: InfluxDB.FieldType.FLOAT,
-        T4: InfluxDB.FieldType.FLOAT,
-        T5: InfluxDB.FieldType.FLOAT,
-        T6: InfluxDB.FieldType.FLOAT,
-        T7: InfluxDB.FieldType.FLOAT,
-        T8: InfluxDB.FieldType.FLOAT,
-        T9: InfluxDB.FieldType.FLOAT,
-        T10: InfluxDB.FieldType.FLOAT,
-        H1: InfluxDB.FieldType.FLOAT,
-        H2: InfluxDB.FieldType.FLOAT
+        // Using string-based field types for compatibility with InfluxDB 1.8.4
+        T1: 'float',
+        T2: 'float',
+        T3: 'float',
+        T4: 'float',
+        T5: 'float',
+        T6: 'float',
+        T7: 'float',
+        T8: 'float',
+        T9: 'float',
+        T10: 'float',
+        H1: 'float',
+        H2: 'float'
         // Air_Speed removed to avoid field type issues
       },
       tags: ['source']
@@ -128,17 +128,29 @@ export async function storePlcData(data) {
     let fieldCount = 0;
     console.log('🔍 Processing PLC data fields...');
     
+    // Create a fields object separately first
+    const fields = {};
+    
     for (const [key, value] of Object.entries(data.data)) {
       // Only process temperature and humidity fields (exclude Air_Speed)
       if (key.startsWith('T') || key.startsWith('H')) {
-        // Explicitly convert to float and ensure no NaN values
-        const numValue = typeof value === 'string' ? parseFloat(value) : Number(value);
-        const finalValue = isNaN(numValue) ? 0.0 : numValue;
-        points[0].fields[key] = finalValue;
-        fieldCount++;
-        console.log(`  - Field ${key}: ${finalValue}`);
+        try {
+          // Explicitly convert to float and ensure no NaN values
+          const numValue = typeof value === 'string' ? parseFloat(value) : Number(value);
+          const finalValue = isNaN(numValue) ? 0.0 : numValue;
+          
+          // Store as a number, not as a string
+          fields[key] = finalValue;
+          fieldCount++;
+          console.log(`  - Field ${key}: ${finalValue} (${typeof finalValue})`);
+        } catch (fieldError) {
+          console.warn(`  - Skipping field ${key} due to error:`, fieldError.message);
+        }
       }
     }
+    
+    // Set all fields at once
+    points[0].fields = fields;
     
     console.log(`✅ Processed ${fieldCount} fields for storage`);
     
