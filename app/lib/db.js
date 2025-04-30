@@ -24,8 +24,8 @@ const influx = new InfluxDB({
         T9: 'float',
         T10: 'float',
         H1: 'float',
-        H2: 'float',
-        Air_Speed: 'float'
+        H2: 'float'
+        // Air_Speed removed to avoid field type issues
       },
       tags: ['source']
     }
@@ -83,8 +83,8 @@ export async function storePlcData(data) {
     
     // Add all data fields to the point
     for (const [key, value] of Object.entries(data.data)) {
-      // Ensure field exists in schema and convert to correct type
-      if (key === 'Air_Speed' || key.startsWith('T') || key.startsWith('H')) {
+      // Only process temperature and humidity fields (exclude Air_Speed)
+      if (key.startsWith('T') || key.startsWith('H')) {
         // Explicitly convert to float and ensure no NaN values
         const numValue = typeof value === 'string' ? parseFloat(value) : Number(value);
         points[0].fields[key] = isNaN(numValue) ? 0.0 : numValue;
@@ -153,18 +153,13 @@ export async function getHistoricalData(timeRange = '24h', customRange = null) {
       WHERE ${timeFilter}
     `;
     
-    // Query air speed data
-    const airSpeedQuery = `
-      SELECT Air_Speed
-      FROM plc_readings
-      WHERE ${timeFilter}
-    `;
+    // Air_Speed is no longer stored in the database, so we'll create mock data
+    // that matches the expected format but with empty values
     
-    // Execute all queries in parallel
-    const [temperatureResults, humidityResults, airSpeedResults] = await Promise.all([
+    // Execute temperature and humidity queries in parallel
+    const [temperatureResults, humidityResults] = await Promise.all([
       influx.query(temperatureQuery),
-      influx.query(humidityQuery),
-      influx.query(airSpeedQuery)
+      influx.query(humidityQuery)
     ]);
     
     // Process and format the results
@@ -188,9 +183,10 @@ export async function getHistoricalData(timeRange = '24h', customRange = null) {
       H2: point.H2 || null
     }));
     
-    const airSpeed = airSpeedResults.map(point => ({
+    // Create empty airSpeed array with the same timestamps as temperature data
+    const airSpeed = temperatureResults.map(point => ({
       time: new Date(point.time).toISOString(),
-      Air_Speed: point.Air_Speed || null
+      Air_Speed: null // Air_Speed is not stored in the database
     }));
     
     return {
