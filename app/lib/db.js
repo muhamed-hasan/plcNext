@@ -83,8 +83,12 @@ export async function storePlcData(data) {
     
     // Add all data fields to the point
     for (const [key, value] of Object.entries(data.data)) {
-      // Convert string values to numbers if needed
-      points[0].fields[key] = typeof value === 'string' ? parseFloat(value) : value;
+      // Ensure field exists in schema and convert to correct type
+      if (key === 'Air_Speed' || key.startsWith('T') || key.startsWith('H')) {
+        // Explicitly convert to float and ensure no NaN values
+        const numValue = typeof value === 'string' ? parseFloat(value) : Number(value);
+        points[0].fields[key] = isNaN(numValue) ? 0.0 : numValue;
+      }
     }
     
     // Write the point to InfluxDB
